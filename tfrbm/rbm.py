@@ -2,8 +2,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
+import scipy.sparse as sp
 import sys
 from .util import tf_xavier_init
+from sklearn.neural_network import BernoulliRBM
 
 
 class RBM:
@@ -35,7 +37,8 @@ class RBM:
         self.learning_rate = learning_rate
         self.momentum = momentum
 
-        self.x = tf.placeholder(tf.float32, [None, self.n_visible])
+        # self.x = tf.placeholder(tf.float32, [None, self.n_visible])
+        self.x = tf.sparse.placeholder(tf.float32, [None, self.n_visible])
         self.y = tf.placeholder(tf.float32, [None, self.n_hidden])
 
         self.w = tf.Variable(tf_xavier_init(self.n_visible, self.n_hidden, const=xavier_const), dtype=tf.float32)
@@ -66,7 +69,7 @@ class RBM:
             cos_val = tf.reduce_mean(tf.reduce_sum(tf.mul(x1_norm, x2_norm), 1))
             self.compute_err = tf.acos(cos_val) / tf.constant(np.pi)
         else:
-            self.compute_err = tf.reduce_mean(tf.square(self.x - self.compute_visible))
+            self.compute_err = tf.reduce_mean(tf.square(tf.sparse.add(self.x, - self.compute_visible)))
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -76,7 +79,9 @@ class RBM:
         pass
 
     def get_err(self, batch_x):
-        return self.sess.run(self.compute_err, feed_dict={self.x: batch_x})
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        return self.sess.run(self.compute_err, feed_dict={self.x: (indices, coo.data, coo.shape)})
 
     def get_free_energy(self):
         pass
@@ -91,7 +96,17 @@ class RBM:
         return self.sess.run(self.compute_visible, feed_dict={self.x: batch_x})
 
     def partial_fit(self, batch_x):
-        self.sess.run(self.update_weights + self.update_deltas, feed_dict={self.x: batch_x})
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        self.sess.run(self.update_weights + self.update_deltas, feed_dict={self.x: (indices, coo.data, coo.shape)})
+
+    def get_likelihood(self, batch_x):
+        W, vb, hb = self.get_weights()
+        rbm = BernoulliRBM(n_components=batch_x.shape[1])
+        rbm.components_ = W.T
+        rbm.intercept_hidden_ = hb
+        rbm.intercept_visible_ = vb
+        return rbm.score_samples(batch_x).mean()
 
     def fit(self,
             data_x,
@@ -134,8 +149,11 @@ class RBM:
 
             for b in r_batches:
                 batch_x = data_x_cpy[b * batch_size:(b + 1) * batch_size]
+                # if sp.isspmatrix_csr(batch_x):
+                #     batch_x = batch_x.toarray()
                 self.partial_fit(batch_x)
                 batch_err = self.get_err(batch_x)
+                # batch_err = self.get_likelihood(batch_x)
                 epoch_errs[epoch_errs_ptr] = batch_err
                 epoch_errs_ptr += 1
 
@@ -143,6 +161,7 @@ class RBM:
                 err_mean = epoch_errs.mean()
                 if self._use_tqdm:
                     self._tqdm.write('Train error: {:.4f}'.format(err_mean))
+                    self._tqdm.write('Likelihood: {:.4f}'.format(self.get_likelihood(data_x_cpy)))
                     self._tqdm.write('')
                 else:
                     print('Train error: {:.4f}'.format(err_mean))
