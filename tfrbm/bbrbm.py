@@ -9,7 +9,7 @@ class BBRBM(RBM):
 
     def _initialize_vars(self):
         hidden_p = tf.nn.sigmoid(tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias)
-        visible_recon_p = tf.nn.sigmoid(tf.matmul(sample_bernoulli(hidden_p), tf.transpose(self.w)) + self.visible_bias)
+        visible_recon_p = tf.nn.sigmoid(tf.matmul(sample_bernoulli(self.y), tf.transpose(self.w)) + self.visible_bias)
         hidden_recon_p = tf.nn.sigmoid(tf.matmul(visible_recon_p, self.w) + self.hidden_bias)
 
         positive_grad = tf.sparse.sparse_dense_matmul(tf.sparse.transpose(self.x), hidden_p)
@@ -34,6 +34,7 @@ class BBRBM(RBM):
         self.update_deltas = [update_delta_w, update_delta_visible_bias, update_delta_hidden_bias]
         self.update_weights = [update_w, update_visible_bias, update_hidden_bias]
 
+        self.hidden_recon_p = hidden_recon_p
         self.compute_hidden = tf.nn.sigmoid(tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias)
         self.compute_visible = tf.nn.sigmoid(tf.matmul(self.compute_hidden, tf.transpose(self.w)) + self.visible_bias)
         self.compute_visible_from_hidden = tf.nn.sigmoid(tf.matmul(self.y, tf.transpose(self.w)) + self.visible_bias)

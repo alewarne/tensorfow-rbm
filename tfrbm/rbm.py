@@ -53,6 +53,7 @@ class RBM:
         self.compute_hidden = None
         self.compute_visible = None
         self.compute_visible_from_hidden = None
+        self.hidden_recon_p = None
 
         self._initialize_vars()
 
@@ -61,6 +62,7 @@ class RBM:
         assert self.compute_hidden is not None
         assert self.compute_visible is not None
         assert self.compute_visible_from_hidden is not None
+        assert self.hidden_recon_p is not None
 
         if err_function == 'cosine':
             x1_norm = tf.nn.l2_normalize(self.x, 1)
@@ -94,10 +96,16 @@ class RBM:
     def reconstruct(self, batch_x):
         return self.sess.run(self.compute_visible, feed_dict={self.x: batch_x})
 
-    def partial_fit(self, batch_x):
+    def partial_fit(self, batch_x, batch_x_tilde):
         coo = batch_x.tocoo()
         indices = np.mat([coo.row, coo.col]).transpose()
-        self.sess.run(self.update_weights + self.update_deltas, feed_dict={self.x: (indices, coo.data, coo.shape)})
+        ret = self.sess.run([self.update_weights + self.update_deltas + [self.hidden_recon_p]], feed_dict={self.x: (indices, coo.data, coo.shape),
+                                                                             self.y: batch_x_tilde})
+        # return the hidden reconstruction for the persitent contrastive divergence algorithm
+        return ret[0][-1]
+
+    def get_hidden_recon_p(self):
+        return self.sess.run(self.hidden_recon_p)
 
     def get_likelihood(self, batch_x):
         W, vb, hb = self.get_weights()
@@ -130,6 +138,7 @@ class RBM:
 
         errs = []
 
+        x_tilde = np.zeros((batch_size, self.n_hidden))
         for e in range(n_epoches):
             if verbose and not self._use_tqdm:
                 print('Epoch: {:d}'.format(e))
@@ -150,7 +159,9 @@ class RBM:
                 batch_x = data_x_cpy[b * batch_size:(b + 1) * batch_size]
                 # if sp.isspmatrix_csr(batch_x):
                 #     batch_x = batch_x.toarray()
-                self.partial_fit(batch_x)
+                x_tilde_new = self.partial_fit(batch_x, x_tilde)
+                # persistent contrastive divergence
+                x_tilde = x_tilde_new
                 batch_err = self.get_err(batch_x)
                 # batch_err = self.get_likelihood(batch_x)
                 epoch_errs[epoch_errs_ptr] = batch_err
