@@ -1,10 +1,6 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from tfrbm import BBRBM, GBRBM
-from tensorflow.examples.tutorials.mnist import input_data
+from tfrbm import BBRBM
 import scipy.sparse as sp
 import numpy as np
-import tensorflow as tf
 import pickle as pkl
 import argparse
 from sklearn.neural_network import BernoulliRBM
