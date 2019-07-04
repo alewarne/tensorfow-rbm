@@ -144,7 +144,8 @@ class RBM:
 
         errs = []
 
-        x_tilde = np.zeros((batch_size, self.n_hidden))
+        # x_tilde = np.zeros((batch_size, self.n_hidden))
+        x_tilde = self.transform(data_x[:batch_size])
         for e in range(n_epoches):
             if verbose and not self._use_tqdm:
                 print('Epoch: {:d}'.format(e))

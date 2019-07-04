@@ -9,19 +9,20 @@ class BBRBM(RBM):
 
     def _initialize_vars(self):
         hidden_p = tf.nn.sigmoid(tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias)
-        visible_recon_p = tf.nn.sigmoid(tf.matmul(sample_bernoulli(self.y), tf.transpose(self.w)) + self.visible_bias)
+        visible_recon_p = sample_bernoulli(tf.nn.sigmoid(tf.matmul(self.y, tf.transpose(self.w)) + self.visible_bias))
         hidden_recon_p = tf.nn.sigmoid(tf.matmul(visible_recon_p, self.w) + self.hidden_bias)
 
         positive_grad = tf.sparse.sparse_dense_matmul(tf.sparse.transpose(self.x), hidden_p)
         negative_grad = tf.matmul(tf.transpose(visible_recon_p), hidden_recon_p)
 
         def f(x_old, x_new):
-            return self.momentum * x_old +\
-                   self.learning_rate * x_new * (1 - self.momentum) / tf.to_float(tf.shape(x_new)[0])
+            # return self.momentum * x_old +\
+            #        self.learning_rate * x_new * (1 - self.momentum) / tf.to_float(tf.shape(x_new)[0])
+            return x_old + self.learning_rate/tf.to_float(x_old.shape[0]) * x_new
 
         delta_w_new = f(self.delta_w, positive_grad - negative_grad)
-        delta_visible_bias_new = f(self.delta_visible_bias, tf.reduce_mean(tf.sparse.add(self.x, - visible_recon_p), 0))
-        delta_hidden_bias_new = f(self.delta_hidden_bias, tf.reduce_mean(hidden_p - hidden_recon_p, 0))
+        delta_visible_bias_new = f(self.delta_visible_bias, tf.reduce_sum(tf.sparse.add(self.x, - visible_recon_p), 0))
+        delta_hidden_bias_new = f(self.delta_hidden_bias, tf.reduce_sum(hidden_p - hidden_recon_p, 0))
 
         update_delta_w = self.delta_w.assign(delta_w_new)
         update_delta_visible_bias = self.delta_visible_bias.assign(delta_visible_bias_new)
