@@ -150,7 +150,7 @@ class RBM:
                 np.random.shuffle(inds)
                 data_x_cpy = data_x_cpy[inds]
 
-            r_batches = range(n_batches)
+            r_batches = range(n_batches-1)
 
             if verbose and self._use_tqdm:
                 r_batches = self._tqdm(r_batches, desc='Epoch: {:d}'.format(e), ascii=True, file=sys.stdout)
