@@ -9,11 +9,11 @@ from sklearn.neural_network import BernoulliRBM
 def get_data(data_path, label_path):
     np.random.seed(42)
     data = sp.load_npz(data_path)[:10000]
-    # labels = np.argmax(np.load(label_path), axis=1)
-    # data_1 = data[np.where(labels == 1)]
+    labels = np.argmax(np.load(label_path), axis=1)
+    data_1 = data[np.where(labels == 1)]
     # random_indices = np.random.choice(np.where(labels == 0)[0], data_1.shape[0], replace=False)
     # data = sp.vstack([data_1, data[random_indices]])
-    return data
+    return data_1
 
 
 def get_likelihood(data, W, vb, hb):
