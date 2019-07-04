@@ -88,7 +88,9 @@ class RBM:
         pass
 
     def transform(self, batch_x):
-        return self.sess.run(self.compute_hidden, feed_dict={self.x: batch_x})
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        return self.sess.run(self.compute_hidden, feed_dict={self.x: (indices, coo.data, coo.shape)})
 
     def transform_inv(self, batch_y):
         return self.sess.run(self.compute_visible_from_hidden, feed_dict={self.y: batch_y})
@@ -113,7 +115,11 @@ class RBM:
         rbm.components_ = W.T
         rbm.intercept_hidden_ = hb
         rbm.intercept_visible_ = vb
-        return rbm.score_samples(batch_x).mean()
+        avg_likelihood = 0
+        N = 10
+        for _ in range(N):
+            avg_likelihood += rbm.score_samples(batch_x).mean()/N
+        return avg_likelihood
 
     def fit(self,
             data_x,
@@ -170,17 +176,38 @@ class RBM:
             if verbose:
                 err_mean = epoch_errs.mean()
                 if self._use_tqdm:
-                    self._tqdm.write('Train error: {:.4f}'.format(err_mean))
-                    self._tqdm.write('Likelihood: {:.4f}'.format(self.get_likelihood(data_x_cpy)))
+                    self._tqdm.write('Train error: {:.8f}'.format(err_mean))
+                    self.epoch_evaluation(data_x_cpy)
                     self._tqdm.write('')
                 else:
-                    print('Train error: {:.4f}'.format(err_mean))
+                    print('Train error: {:.8f}'.format(err_mean))
                     print('')
                 sys.stdout.flush()
 
             errs = np.hstack([errs, epoch_errs])
 
         return errs
+
+    def epoch_evaluation(self, data_x_cpy):
+        W, h_v, h_h = self.get_weights()
+        transformed = self.transform(data_x_cpy)
+        self._tqdm.write('Likelihood: {:.4f}'.format(self.get_likelihood(data_x_cpy)))
+        self._tqdm.write('Avg activation: {:.4f}, Avg max activation: {:.4f}, Avg min activation: {:.4f}'.format(
+                                                                                                transformed.mean(),
+                                                                                np.max(transformed, axis=1).mean(),
+                                                                                np.min(transformed, axis=1).mean()
+                                                                                                                    )
+                        )
+        self._tqdm.write('Avg hidden bias: {:.4f}, max hidden bias: {:.4f}, min hidden bias: {:.4f}'.format(h_h.mean(),
+                                                                                                    np.max(h_h),
+                                                                                                    np.min(h_h)
+                                                                                                    )
+                         )
+        self._tqdm.write('Avg visible bias: {:.4f}, max visible bias: {:.4f}, min visible bias: {:.4f}'.format(h_v.mean(),
+                                                                                                        np.max(h_v),
+                                                                                                        np.min(h_v)
+                                                                                                        )
+                         )
 
     def get_weights(self):
         return self.sess.run(self.w),\
