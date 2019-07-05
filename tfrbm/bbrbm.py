@@ -8,21 +8,20 @@ class BBRBM(RBM):
         RBM.__init__(self, *args, **kwargs)
 
     def _initialize_vars(self):
-        hidden_p = tf.nn.sigmoid(tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias)
+        hidden_p = tf.nn.sigmoid(tf.matmul(self.x, self.w) + self.hidden_bias)
         visible_recon_p = sample_bernoulli(tf.nn.sigmoid(tf.matmul(self.y, tf.transpose(self.w)) + self.visible_bias))
         hidden_recon_p = tf.nn.sigmoid(tf.matmul(visible_recon_p, self.w) + self.hidden_bias)
 
-        positive_grad = tf.sparse.sparse_dense_matmul(tf.sparse.transpose(self.x), hidden_p)
+        positive_grad = tf.matmul(tf.transpose(self.x), hidden_p)
         negative_grad = tf.matmul(tf.transpose(visible_recon_p), hidden_recon_p)
 
-        def f(x_old, x_new):
-            # return self.momentum * x_old +\
-            #        self.learning_rate * x_new * (1 - self.momentum) / tf.to_float(tf.shape(x_new)[0])
-            return x_old + self.learning_rate/tf.to_float(x_old.shape[0]) * x_new
+        def momentum(x_old, x_new):
+            return self.momentum * x_old +\
+                   self.learning_rate * x_new * (1 - self.momentum) / tf.to_float(self.batch_size)
 
-        delta_w_new = f(self.delta_w, positive_grad - negative_grad)
-        delta_visible_bias_new = f(self.delta_visible_bias, tf.reduce_sum(tf.sparse.add(self.x, - visible_recon_p), 0))
-        delta_hidden_bias_new = f(self.delta_hidden_bias, tf.reduce_sum(hidden_p - hidden_recon_p, 0))
+        delta_w_new = momentum(self.delta_w, positive_grad - negative_grad)
+        delta_visible_bias_new = momentum(self.delta_visible_bias, tf.reduce_sum(self.x - visible_recon_p, 0))
+        delta_hidden_bias_new = momentum(self.delta_hidden_bias, tf.reduce_sum(hidden_p - hidden_recon_p, 0))
 
         update_delta_w = self.delta_w.assign(delta_w_new)
         update_delta_visible_bias = self.delta_visible_bias.assign(delta_visible_bias_new)
@@ -36,6 +35,6 @@ class BBRBM(RBM):
         self.update_weights = [update_w, update_visible_bias, update_hidden_bias]
 
         self.hidden_recon_p = sample_bernoulli(hidden_recon_p)
-        self.compute_hidden = tf.nn.sigmoid(tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias)
+        self.compute_hidden = tf.nn.sigmoid(tf.matmul(self.x, self.w) + self.hidden_bias)
         self.compute_visible = tf.nn.sigmoid(tf.matmul(self.compute_hidden, tf.transpose(self.w)) + self.visible_bias)
         self.compute_visible_from_hidden = tf.nn.sigmoid(tf.matmul(self.y, tf.transpose(self.w)) + self.visible_bias)
