@@ -10,7 +10,7 @@ from tfrbm.util import load_npy_npz_pkl
 def get_data(data_path, label_path):
     np.random.seed(42)
     data = load_npy_npz_pkl(data_path)
-    # data = sp.csr_matrix(data)
+    data = sp.csr_matrix(data)
     labels = np.load(label_path)
     if len(labels.shape) > 1:
         labels = np.argmax(labels, axis=1)

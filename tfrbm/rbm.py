@@ -36,8 +36,8 @@ class RBM:
         self.learning_rate = learning_rate
         self.momentum = momentum
 
-        self.x = tf.placeholder(tf.float32, [None, self.n_visible])
-        # self.x = tf.sparse.placeholder(tf.float32, [None, self.n_visible])
+        # self.x = tf.placeholder(tf.float32, [None, self.n_visible])
+        self.x = tf.sparse.placeholder(tf.float32, [None, self.n_visible])
         self.y = tf.placeholder(tf.float32, [None, self.n_hidden])
         self.batch_size = tf.placeholder(tf.float32)
 
@@ -71,7 +71,8 @@ class RBM:
             cos_val = tf.reduce_mean(tf.reduce_sum(tf.mul(x1_norm, x2_norm), 1))
             self.compute_err = tf.acos(cos_val) / tf.constant(np.pi)
         else:
-            self.compute_err = tf.reduce_mean(tf.square(self.x - self.compute_visible))
+            # self.compute_err = tf.reduce_mean(tf.square(self.x - self.compute_visible))
+            self.compute_err = tf.reduce_mean(tf.square(tf.sparse_add(self.x, - self.compute_visible)))
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -81,19 +82,19 @@ class RBM:
         pass
 
     def get_err(self, batch_x):
-        # coo = batch_x.tocoo()
-        # indices = np.mat([coo.row, coo.col]).transpose()
-        # return self.sess.run(self.compute_err, feed_dict={self.x: (indices, coo.data, coo.shape)})
-        return self.sess.run(self.compute_err, feed_dict={self.x: batch_x})
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        return self.sess.run(self.compute_err, feed_dict={self.x: (indices, coo.data, coo.shape)})
+        # return self.sess.run(self.compute_err, feed_dict={self.x: batch_x})
 
     def get_free_energy(self):
         pass
 
     def transform(self, batch_x):
-        # coo = batch_x.tocoo()
-        # indices = np.mat([coo.row, coo.col]).transpose()
-        # return self.sess.run(self.compute_hidden, feed_dict={self.x: (indices, coo.data, coo.shape)})
-        return self.sess.run(self.compute_hidden, feed_dict={self.x: batch_x})
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        return self.sess.run(self.compute_hidden, feed_dict={self.x: (indices, coo.data, coo.shape)})
+        # return self.sess.run(self.compute_hidden, feed_dict={self.x: batch_x})
 
     def transform_inv(self, batch_y):
         return self.sess.run(self.compute_visible_from_hidden, feed_dict={self.y: batch_y})
@@ -102,12 +103,15 @@ class RBM:
         return self.sess.run(self.compute_visible, feed_dict={self.x: batch_x})
 
     def partial_fit(self, batch_x, batch_x_tilde):
-        # coo = batch_x.tocoo()
-        # indices = np.mat([coo.row, coo.col]).transpose()
-        # ret = self.sess.run([self.update_weights + self.update_deltas + [self.hidden_recon_p]], feed_dict={self.x: (indices, coo.data, coo.shape),
-        #                                                                      self.y: batch_x_tilde})
-        ret = self.sess.run([self.update_weights + self.update_deltas + [self.hidden_recon_p]],
-                            feed_dict={self.x: batch_x, self.y: batch_x_tilde, self.batch_size: batch_x.shape[0]})
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        ret = self.sess.run([self.update_weights + self.update_deltas + [self.hidden_recon_p]], feed_dict={
+                                                                                self.x: (indices, coo.data, coo.shape),
+                                                                                self.y: batch_x_tilde,
+                                                                                self.batch_size: batch_x.shape[0]
+                                                                                                        })
+        # ret = self.sess.run([self.update_weights + self.update_deltas + [self.hidden_recon_p]],
+        #                     feed_dict={self.x: batch_x, self.y: batch_x_tilde, self.batch_size: batch_x.shape[0]})
         # return the hidden reconstruction for the persitent contrastive divergence algorithm
         return ret[0][-1]
 
@@ -174,7 +178,6 @@ class RBM:
                 # persistent contrastive divergence
                 x_tilde = x_tilde_new
                 batch_err = self.get_err(batch_x)
-                # batch_err = self.get_likelihood(batch_x)
                 epoch_errs[epoch_errs_ptr] = batch_err
                 epoch_errs_ptr += 1
 
