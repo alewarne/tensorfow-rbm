@@ -87,8 +87,11 @@ class RBM:
         return self.sess.run(self.compute_err, feed_dict={self.x: (indices, coo.data, coo.shape)})
         # return self.sess.run(self.compute_err, feed_dict={self.x: batch_x})
 
-    def get_free_energy(self):
-        pass
+    def get_free_energy(self, batch_x):
+        coo = batch_x.tocoo()
+        indices = np.mat([coo.row, coo.col]).transpose()
+        return self.sess.run(self.free_energy, feed_dict={self.x: (indices, coo.data, coo.shape),
+                                                          self.batch_size:batch_x.shape[0]})
 
     def transform(self, batch_x):
         coo = batch_x.tocoo()
@@ -200,6 +203,8 @@ class RBM:
         W, h_v, h_h = self.get_weights()
         transformed = self.transform(data_x_cpy)
         self._tqdm.write('Likelihood: {:.4f}'.format(self.get_likelihood(data_x_cpy)))
+        e = self.get_free_energy(data_x_cpy)
+        self._tqdm.write('Free energy: {:.4f}'.format(e))
         self._tqdm.write('Avg activation: {:.4f}, Avg max activation: {:.4f}, Avg min activation: {:.4f}'.format(
                                                                                                 transformed.mean(),
                                                                                 np.max(transformed, axis=1).mean(),

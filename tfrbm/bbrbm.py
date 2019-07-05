@@ -38,3 +38,10 @@ class BBRBM(RBM):
         self.compute_hidden = tf.nn.sigmoid(tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias)
         self.compute_visible = tf.nn.sigmoid(tf.matmul(self.compute_hidden, tf.transpose(self.w)) + self.visible_bias)
         self.compute_visible_from_hidden = tf.nn.sigmoid(tf.matmul(self.y, tf.transpose(self.w)) + self.visible_bias)
+
+        # quantities necessary for computing free energy
+        inp_t_h = tf.sparse.sparse_dense_matmul(self.x, tf.reshape(self.visible_bias, shape=(tf.shape(self.visible_bias)[0], 1)))
+        inp_t_w = tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias
+        # sum_ log(1+exp(W*x+b_h))
+        log_sum = tf.reduce_logsumexp([tf.zeros(shape=(self.batch_size, self.n_hidden)), inp_t_w], axis=0)
+        self.free_energy = [tf.reduce_sum(-inp_t_h - log_sum, axis=1), log_sum, inp_t_w, inp_t_h]
