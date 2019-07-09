@@ -41,7 +41,9 @@ class BBRBM(RBM):
 
         # quantities necessary for computing free energy
         inp_t_h = tf.sparse.sparse_dense_matmul(self.x, tf.reshape(self.visible_bias, shape=(tf.shape(self.visible_bias)[0], 1)))
+        inp_t_h = tf.reshape(inp_t_h, shape=(tf.shape(inp_t_h)[0],))
         inp_t_w = tf.sparse.sparse_dense_matmul(self.x, self.w) + self.hidden_bias
         # sum_ log(1+exp(W*x+b_h))
         log_sum = tf.reduce_logsumexp([tf.zeros(shape=(self.batch_size, self.n_hidden)), inp_t_w], axis=0)
-        self.free_energy = [tf.reduce_sum(-inp_t_h - log_sum, axis=1), log_sum, inp_t_w, inp_t_h]
+        log_sum_sum = tf.reduce_sum(log_sum, axis=1)
+        self.free_energy = -inp_t_h - log_sum_sum
